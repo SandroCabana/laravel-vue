@@ -1,60 +1,67 @@
 <template>
-    <div class="overflow-hidden overflow-x-auto p-6 bg-white border-gray-200">
-        <div class="min-w-full align-middle">
-            <table class="min-w-full divide-y divide-gray-200 border">
-                <thead>
-                    <tr>
-                        <th class="px-6 py-3 bg-gray-50 text-left">
-                            <span class="text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">ID</span>
-                        </th>
-                        <th class="px-6 py-3 bg-gray-50 text-left">
-                            <span class="text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Title</span>
-                        </th>
-                        <th class="px-6 py-3 bg-gray-50 text-left">
-                            <span class="text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Content</span>
-                        </th>
-                        <th class="px-6 py-3 bg-gray-50 text-left">
-                            <span class="text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Created at</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200 divide-solid">
-                    <tr v-for="post in posts">
-                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-900">
-                            {{ post.id }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-900">
-                            {{ post.title }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-900">
-                            {{ post.content }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-900">
-                            {{ post.created_at }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <canvas ref="canvas" />
 </template>
 
-<script>
-export default {
-    data() {
-        return {
-            posts: []
-        }
-    },
-    mounted() {
-        this.fetchPosts()
-    },
-    methods: {
-        fetchPosts() {
-            axios.get('/api/posts')
-                .then(response => this.posts = response.data)
-                .catch(error => console.log(error))
-        }
-    }
-}
+<script setup>
+    import { ref, onMounted, computed, watchEffect } from "vue";
+import { Scene } from "three";
+import { useWindowSize, useMouse  } from "@vueuse/core";
+import { initRenderer, updateRenderer } from "../../composables/renderer";
+import { initCamera, updateCamera } from "../../composables/camera";
+
+const { x, y } = useMouse();
+const canvas = ref(null);
+
+const scene = new Scene();
+
+let renderer = null;
+
+let camera = null;
+
+const { width, height } = useWindowSize();
+const aspectRatio = computed(() => width.value / height.value);
+
+const cameraX = computed(() => x.value / width.value -0.5);
+const cameraY = computed(() => -(y.value / height.value -0.5));
+
+
+
+camera = initCamera();
+
+scene.add(camera);
+import { createCube } from "../../composables/cube";
+
+const cube = createCube()
+
+scene.add(cube);
+
+watchEffect(() => {
+    updateRenderer(renderer, width.value, height.value);
+    updateCamera(camera, aspectRatio.value);
+});
+
+onMounted(() => {
+    renderer = initRenderer(canvas.value);
+    updateRenderer(renderer, width.value, height.value);
+    updateCamera(camera, aspectRatio.value);
+
+    const tick = () => {
+        //render
+        camera.position.x = cameraX.value;
+        camera.position.y = cameraY.value;
+        renderer.render(scene, camera);
+        window.requestAnimationFrame(tick);
+
+        cube.rotation.y += 0.01
+        cube.rotation.x += 0.01
+    };
+
+    tick();
+});
 </script>
+<style>
+canvas {
+position: absolute;
+touch-action: none;
+}
+</style>
